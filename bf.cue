@@ -196,6 +196,28 @@ _#eval: {
                 }).out
             }
 
+            if token == _#tokens.comma {
+                out: [] + ((_#impl & {"\(next)": _})[next] & {
+                    "memory": [for i, cell in memory {
+                        if i == pointer {
+                            if inputPointer < len(input) {
+                                input[inputPointer]
+                            }
+                            if inputPointer >= len(input) {
+                                0
+                            }
+                        }
+                        if i != pointer {
+                            cell + 0
+                        }
+                    }]
+                    "output": output
+                    "instructionPointer": instructionPointer + 1
+                    "pointer": pointer + 0
+                    "inputPointer": inputPointer + 1
+                }).out
+            }
+
             if token == _#tokens.lbracket {
                 if memory[pointer] == 0 {
                     out: [] + ((_#impl & {"\(next)": _})[next] & {
