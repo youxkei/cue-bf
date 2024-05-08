@@ -64,7 +64,7 @@ _#parse: {
             let token = tokens[i]
 
             if token == _#tokens.lbracket {
-                out: [] + ((_#impl & {"\(next)": _})[next] & {
+                out: [] + ((_#impl & {(next): _})[next] & {
                     "lbrackets": [i] + lbrackets
                     "bracketMap": bracketMap
                     "i": i + 1
@@ -72,7 +72,7 @@ _#parse: {
             }
 
             if token == _#tokens.rbracket {
-                out: [] + ((_#impl & {"\(next)": _})[next] & {
+                out: [] + ((_#impl & {(next): _})[next] & {
                     "lbrackets": list.Drop(lbrackets, 1)
                     "bracketMap": bracketMap & {
                         "\(lbrackets[0])": i
@@ -132,7 +132,7 @@ _#eval: {
             let token = tokens[instructionPointer]
 
             if token == _#tokens.gt {
-                out: [] + ((_#impl & {"\(next)": _})[next] & {
+                out: [] + ((_#impl & {(next): _})[next] & {
                     "memory": memory
                     "output": output
                     "instructionPointer": instructionPointer + 1
@@ -142,7 +142,7 @@ _#eval: {
             }
 
             if token == _#tokens.lt {
-                out: [] + ((_#impl & {"\(next)": _})[next] & {
+                out: [] + ((_#impl & {(next): _})[next] & {
                     "memory": memory
                     "output": output
                     "instructionPointer": instructionPointer + 1
@@ -152,7 +152,7 @@ _#eval: {
             }
 
             if token == _#tokens.plus {
-                out: [] + ((_#impl & {"\(next)": _})[next] & {
+                out: [] + ((_#impl & {(next): _})[next] & {
                     "memory": [for i, cell in memory {
                         if i == pointer {
                             cell + 1
@@ -170,7 +170,7 @@ _#eval: {
             }
 
             if token == _#tokens.minus {
-                out: [] + ((_#impl & {"\(next)": _})[next] & {
+                out: [] + ((_#impl & {(next): _})[next] & {
                     "memory": [for i, cell in memory {
                         if i == pointer {
                             cell - 1
@@ -187,7 +187,7 @@ _#eval: {
             }
 
             if token == _#tokens.period {
-                out: [] + ((_#impl & {"\(next)": _})[next] & {
+                out: [] + ((_#impl & {(next): _})[next] & {
                     "memory": memory
                     "output": output + [memory[pointer]]
                     "instructionPointer": instructionPointer + 1
@@ -197,7 +197,7 @@ _#eval: {
             }
 
             if token == _#tokens.comma {
-                out: [] + ((_#impl & {"\(next)": _})[next] & {
+                out: [] + ((_#impl & {(next): _})[next] & {
                     "memory": [for i, cell in memory {
                         if i == pointer {
                             if inputPointer < len(input) {
@@ -220,7 +220,7 @@ _#eval: {
 
             if token == _#tokens.lbracket {
                 if memory[pointer] == 0 {
-                    out: [] + ((_#impl & {"\(next)": _})[next] & {
+                    out: [] + ((_#impl & {(next): _})[next] & {
                         "memory": memory
                         "output": output
                         "instructionPointer": bracketMap["\(instructionPointer)"] + 1
@@ -230,7 +230,7 @@ _#eval: {
                 }
 
                 if memory[pointer] != 0 {
-                    out: [] + ((_#impl & {"\(next)": _})[next] & {
+                    out: [] + ((_#impl & {(next): _})[next] & {
                         "memory": memory
                         "output": output
                         "instructionPointer": instructionPointer + 1
@@ -242,7 +242,7 @@ _#eval: {
 
             if token == _#tokens.rbracket {
                 if memory[pointer] == 0 {
-                    out: [] + ((_#impl & {"\(next)": _})[next] & {
+                    out: [] + ((_#impl & {(next): _})[next] & {
                         "memory": memory
                         "output": output
                         "instructionPointer": instructionPointer + 1
@@ -252,7 +252,7 @@ _#eval: {
                 }
 
                 if memory[pointer] != 0 {
-                    out: [] + ((_#impl & {"\(next)": _})[next] & {
+                    out: [] + ((_#impl & {(next): _})[next] & {
                         "memory": memory
                         "output": output
                         "instructionPointer": bracketMap["\(instructionPointer)"] + 1
