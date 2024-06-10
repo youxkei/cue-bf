@@ -41,6 +41,7 @@ _#lex: {
 
     out: {
         tokens: [for rune in strings.Runes(sourceCode) if (_#isToken & { "rune": rune }).out {rune}]
+        ...
     }
 }
 
@@ -99,6 +100,7 @@ _#parse: {
             bracketMap: {}
             i: 0
         }).out[0]
+        ...
     }
 }
 
@@ -280,11 +282,11 @@ _#eval: {
 
     out: string
 
-    _lexed: (_#lex & {
+    _tokens: (_#lex & {
         "sourceCode": sourceCode
     }).out
 
-    _parsed: (_#parse & _lexed).out
+    _parsed: (_#parse & _tokens).out
 
     _evaluated: (_#eval & _parsed & {
         "input": input
