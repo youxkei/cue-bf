@@ -108,7 +108,6 @@ _#eval: {
     tokens: [..._#Token]
     bracketMap: { [_]: uint }
     input: [...uint8]
-    memorySize: uint
 
     let numTokens = len(tokens)
 
@@ -135,7 +134,14 @@ _#eval: {
 
             if token == _#tokens.gt {
                 out: [for out in ((_#impl & {(next): _})[next] & {
-                    "memory": memory
+                    if pointer + 1 == len(memory)  {
+                        "memory": list.Concat([memory, [0]])
+                    }
+
+                    if pointer + 1 < len(memory) {
+                        "memory": memory
+                    }
+
                     "output": output
                     "instructionPointer": instructionPointer + 1
                     "pointer": pointer + 1
@@ -267,7 +273,7 @@ _#eval: {
     }
 
     out: ((_#impl & {"0": _})["0"] & {
-        memory: [for _ in list.Range(0, memorySize, 1) {0}]
+        memory: [0]
         output: []
         instructionPointer: 0
         pointer: 0
@@ -278,7 +284,6 @@ _#eval: {
 #run: {
     sourceCode: string
     input: [...uint8]
-    memorySize: uint
 
     out: string
 
@@ -290,7 +295,6 @@ _#eval: {
 
     _evaluated: (_#eval & _parsed & {
         "input": input
-        "memorySize": memorySize
     }).out
 
     out: strings.Join([for c in _evaluated.output { _#uint7ToString[c] }], "")
