@@ -108,6 +108,7 @@ _#eval: {
     tokens: [..._#Token]
     bracketMap: { [_]: uint }
     input: [...uint8]
+    byteMode: bool
 
     let numTokens = len(tokens)
 
@@ -163,7 +164,10 @@ _#eval: {
                 out: [for out in ((_#impl & {(next): _})[next] & {
                     "memory": [for i, cell in memory {
                         if i == pointer {
-                            cell + 1
+                            [
+                                if byteMode && cell + 1 == 256 { 0 },
+                                cell + 1
+                            ][0]
                         }
 
                         if i != pointer {
@@ -181,7 +185,10 @@ _#eval: {
                 out: [for out in ((_#impl & {(next): _})[next] & {
                     "memory": [for i, cell in memory {
                         if i == pointer {
-                            cell - 1
+                            [
+                                if byteMode && cell - 1 == -1 { 255 },
+                                cell - 1
+                            ][0]
                         }
                         if i != pointer {
                             cell + 0
@@ -284,6 +291,7 @@ _#eval: {
 #run: {
     sourceCode: string
     input: [...uint8]
+    byteMode: bool | *false
 
     out: string
 
@@ -295,6 +303,7 @@ _#eval: {
 
     _evaluated: (_#eval & _parsed & {
         "input": input
+        "byteMode": byteMode
     }).out
 
     out: strings.Join([for c in _evaluated.output { _#uint7ToString[c] }], "")
