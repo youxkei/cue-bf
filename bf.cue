@@ -36,12 +36,11 @@ _#isToken: {
     out: (rune & _#Token) != _|_
 }
 
-_#lex: {
+_#scan: {
     sourceCode: string
 
     out: {
         tokens: [for rune in strings.Runes(sourceCode) if (_#isToken & { "rune": rune }).out {rune}]
-        ...
     }
 }
 
@@ -100,7 +99,6 @@ _#parse: {
             bracketMap: {}
             i: 0
         }).out[0]
-        ...
     }
 }
 
@@ -295,13 +293,22 @@ _#eval: {
 
     out: string
 
-    _tokens: (_#lex & {
-        "sourceCode": sourceCode
-    }).out
+    _tokens: {
+        (_#scan & {
+            "sourceCode": sourceCode
+        }).out
+        ...
+    }
 
-    _parsed: (_#parse & _tokens).out
+    _parsed: {
+        (_#parse & {
+            _tokens
+        }).out
+        ...
+    }
 
-    _evaluated: (_#eval & _parsed & {
+    _evaluated: (_#eval & {
+        _parsed
         "input": input
         "byteMode": byteMode
     }).out
