@@ -17,281 +17,324 @@ _#uint7ToString: [
     "\u0070", "\u0071", "\u0072", "\u0073", "\u0074", "\u0075", "\u0076", "\u0077", "\u0078", "\u0079", "\u007A", "\u007B", "\u007C", "\u007D", "\u007E", "\u007F",
 ]
 
-_#tokens: {
-    gt: strings.Runes(">")[0]
-    lt: strings.Runes("<")[0]
-    plus: strings.Runes("+")[0]
-    minus: strings.Runes("-")[0]
-    period: strings.Runes(".")[0]
-    comma: strings.Runes(",")[0]
-    lbracket: strings.Runes("[")[0]
-    rbracket: strings.Runes("]")[0]
-}
-
-_#Token: or([for token in _#tokens { token }])
-
-_#isToken: {
-    rune: uint
-
-    out: (rune & _#Token) != _|_
-}
-
-_#scan: {
-    sourceCode: string
-
-    out: {
-        tokens: [for rune in strings.Runes(sourceCode) if (_#isToken & { "rune": rune }).out {rune}]
-    }
-}
+_#plus: strings.Runes("+")[0]
+_#minus: strings.Runes("-")[0]
+_#gt: strings.Runes(">")[0]
+_#lt: strings.Runes("<")[0]
+_#lbracket: strings.Runes("[")[0]
+_#rbracket: strings.Runes("]")[0]
+_#period: strings.Runes(".")[0]
+_#comma: strings.Runes(",")[0]
 
 _#parse: {
-    tokens: [..._#Token]
+    tokens: [...int]
 
-    let numTokens = len(tokens)
-
-    // lbrackets and bracketMap are passed to the next depth as newly built
-    // values, not as plain references like `"bracketMap": bracketMap`. A plain
-    // reference shares the previous depth's vertex, and when the same branch
-    // runs again cue resolves the same reference on that vertex a second time
-    // and reports a structural cycle.
-    _#impl: [depth = =~"^\\d+$"]: {
-        let next = "\(strconv.Atoi(depth) + 1)"
-
-        i: uint
-        lbrackets: [...uint]
-        bracketMap: { [_]: uint }
-
-        if i == numTokens {
-            out: [bracketMap]
+    _scan: [for i in list.Range(0, len(tokens) + 1, 1) {
+        if i == 0 {
+            {stack: [], pairs: []}
         }
 
-        if i < numTokens {
-            let token = tokens[i]
-
-            if token == _#tokens.lbracket {
-                out: [for out in ((_#impl & {(next): _})[next] & {
-                    "lbrackets": list.Concat([[i], lbrackets])
-                    "bracketMap": {for k, v in bracketMap { (k): v + 0 }}
-                    "i": i + 1
-                }).out { out }]
+        if i > 0 {
+            if tokens[i - 1] == _#lbracket {
+                {
+                    stack: [i - 1, for s in _scan[i - 1].stack { s + 0 }]
+                    pairs: [for p in _scan[i - 1].pairs { [p[0] + 0, p[1] + 0] }]
+                }
             }
 
-            if token == _#tokens.rbracket {
-                out: [for out in ((_#impl & {(next): _})[next] & {
-                    "lbrackets": list.Drop(lbrackets, 1)
-                    "bracketMap": {for k, v in bracketMap { (k): v + 0 }} & {
-                        "\(lbrackets[0])": i
-                        "\(i)": lbrackets[0]
+            if tokens[i - 1] == _#rbracket {
+                {
+                    stack: [for k, s in _scan[i - 1].stack if k > 0 { s + 0 }]
+                    pairs: [for p in _scan[i - 1].pairs { [p[0] + 0, p[1] + 0] }, [_scan[i - 1].stack[0] + 0, i - 1]]
+                }
+            }
+
+            if tokens[i - 1] != _#lbracket && tokens[i - 1] != _#rbracket {
+                {
+                    stack: [for s in _scan[i - 1].stack { s + 0 }]
+                    pairs: [for p in _scan[i - 1].pairs { [p[0] + 0, p[1] + 0] }]
+                }
+            }
+        }
+    }]
+
+    _pairs: _scan[len(tokens)].pairs
+
+    bracketMap: [for i, _ in tokens {
+        [
+            for p in _pairs if p[0] == i { p[1] },
+            for p in _pairs if p[1] == i { p[0] },
+            0,
+        ][0]
+    }]
+}
+
+_#evalChunk: {
+    tokens: [...int]
+    positions: [...int]
+    bracketMap: [...int]
+    input: [...uint8]
+    size: int
+    wrapAround: bool | *true
+    start: {
+        ip: uint
+        pointer: uint
+        memory: [...int]
+        output: [...uint8]
+        inputPointer: uint
+    }
+
+    _#step: {
+        in: {
+            halted: false
+            ip: uint
+            pointer: uint
+            memory: [...int]
+            output: [...uint8]
+            inputPointer: uint
+        }
+
+        if tokens[in.ip] == _#plus {
+            out: {
+                halted: false
+                ip: in.ip + 1
+                pointer: in.pointer + 0
+                memory: [for i, c in in.memory {
+                    if i == in.pointer {
+                        [
+                            if wrapAround && c + 1 == 256 { 0 },
+                            c + 1,
+                        ][0]
                     }
-                    "i": i + 1
-                }).out { out }]
+                    if i != in.pointer { c + 0 }
+                }]
+                output: [for c in in.output { c + 0 }]
+                inputPointer: in.inputPointer + 0
+            }
+        }
+
+        if tokens[in.ip] == _#minus {
+            out: {
+                halted: false
+                ip: in.ip + 1
+                pointer: in.pointer + 0
+                memory: [for i, c in in.memory {
+                    if i == in.pointer {
+                        [
+                            if wrapAround && c - 1 == -1 { 255 },
+                            c - 1,
+                        ][0]
+                    }
+                    if i != in.pointer { c + 0 }
+                }]
+                output: [for c in in.output { c + 0 }]
+                inputPointer: in.inputPointer + 0
+            }
+        }
+
+        if tokens[in.ip] == _#lt {
+            if in.pointer == 0 {
+                out: error("\"<\" at position \(positions[in.ip]) moves the pointer to the left of the first cell")
             }
 
-            if token != _#tokens.lbracket && token != _#tokens.rbracket {
-                out: [for out in ((_#impl & {"\(next)": _})[next] & {
-                    "lbrackets": [for l in lbrackets { l + 0 }]
-                    "bracketMap": {for k, v in bracketMap { (k): v + 0 }}
-                    "i": i + 1
-                }).out { out }]
+            if in.pointer > 0 {
+                out: {
+                    halted: false
+                    ip: in.ip + 1
+                    pointer: in.pointer - 1
+                    memory: [for c in in.memory { c + 0 }]
+                    output: [for c in in.output { c + 0 }]
+                    inputPointer: in.inputPointer + 0
+                }
+            }
+        }
+
+        if tokens[in.ip] == _#lbracket {
+            out: {
+                halted: false
+                if in.memory[in.pointer] == 0 {
+                    ip: bracketMap[in.ip] + 1
+                }
+                if in.memory[in.pointer] != 0 {
+                    ip: in.ip + 1
+                }
+                pointer: in.pointer + 0
+                memory: [for c in in.memory { c + 0 }]
+                output: [for c in in.output { c + 0 }]
+                inputPointer: in.inputPointer + 0
+            }
+        }
+
+        if tokens[in.ip] == _#rbracket {
+            out: {
+                halted: false
+                if in.memory[in.pointer] == 0 {
+                    ip: in.ip + 1
+                }
+                if in.memory[in.pointer] != 0 {
+                    ip: bracketMap[in.ip] + 1
+                }
+                pointer: in.pointer + 0
+                memory: [for c in in.memory { c + 0 }]
+                output: [for c in in.output { c + 0 }]
+                inputPointer: in.inputPointer + 0
+            }
+        }
+
+        if tokens[in.ip] == _#gt {
+            out: {
+                halted: false
+                ip: in.ip + 1
+                pointer: in.pointer + 1
+                if in.pointer + 1 == len(in.memory) {
+                    memory: [for c in in.memory { c + 0 }, 0]
+                }
+                if in.pointer + 1 < len(in.memory) {
+                    memory: [for c in in.memory { c + 0 }]
+                }
+                output: [for c in in.output { c + 0 }]
+                inputPointer: in.inputPointer + 0
+            }
+        }
+
+        if tokens[in.ip] == _#period {
+            if in.memory[in.pointer] < 0 || in.memory[in.pointer] > 255 {
+                out: error("\".\" at position \(positions[in.ip]) outputs \(in.memory[in.pointer]), which is not a byte")
+            }
+
+            if in.memory[in.pointer] >= 0 && in.memory[in.pointer] <= 255 {
+                out: {
+                    halted: false
+                    ip: in.ip + 1
+                    pointer: in.pointer + 0
+                    memory: [for c in in.memory { c + 0 }]
+                    output: [for c in in.output { c + 0 }, in.memory[in.pointer] + 0]
+                    inputPointer: in.inputPointer + 0
+                }
+            }
+        }
+
+        if tokens[in.ip] == _#comma {
+            out: {
+                halted: false
+                ip: in.ip + 1
+                pointer: in.pointer + 0
+                memory: [for i, c in in.memory {
+                    if i == in.pointer {
+                        if in.inputPointer < len(input) { input[in.inputPointer] + 0 }
+                        if in.inputPointer >= len(input) { 0 }
+                    }
+                    if i != in.pointer { c + 0 }
+                }]
+                output: [for c in in.output { c + 0 }]
+                inputPointer: in.inputPointer + 1
             }
         }
     }
 
-    out: {
-        "tokens": tokens
-        bracketMap: ((_#impl & {"0": _})["0"] & {
-            lbrackets: []
-            bracketMap: {}
-            i: 0
-        }).out[0]
-    }
+    // states[j] refers to states[j - 1] directly rather than through a let:
+    // a let that refers to j resolves to a new vertex holding its expression
+    // instead of to the list element, so each element is evaluated again
+    // inside the next element's copy, and the work doubles with each element.
+    // The conditions are nested ifs because && evaluates both of its operands,
+    // and a halted state has none of the fields the second one would read.
+    states: [for j in list.Range(0, size + 1, 1) {
+        if j == 0 {
+            {
+                halted: false
+                ip: start.ip + 0
+                pointer: start.pointer + 0
+                memory: [for c in start.memory { c + 0 }]
+                output: [for c in start.output { c + 0 }]
+                inputPointer: start.inputPointer + 0
+            }
+        }
+
+        if j > 0 {
+            if states[j - 1].halted {
+                {halted: true}
+            }
+
+            if !states[j - 1].halted {
+                if states[j - 1].ip == len(tokens) {
+                    {halted: true}
+                }
+
+                if states[j - 1].ip < len(tokens) {
+                    (_#step & {
+                        in: {
+                            halted: false
+                            ip: states[j - 1].ip
+                            pointer: states[j - 1].pointer
+                            memory: states[j - 1].memory
+                            output: states[j - 1].output
+                            inputPointer: states[j - 1].inputPointer
+                        }
+                    }).out
+                }
+            }
+        }
+    }]
+
+    _running: [for s in states if !s.halted { s }]
+
+    last: _running[len(_running) - 1]
+    done: len(_running) < len(states)
 }
 
 _#eval: {
-    tokens: [..._#Token]
-    bracketMap: { [_]: uint }
+    tokens: [...int]
+    positions: [...int]
+    bracketMap: [...int]
     input: [...uint8]
-    wrapAround: bool
+    wrapAround: bool | *true
+    firstSize: int
 
-    let numTokens = len(tokens)
-
-    // As with lbrackets and bracketMap in _#parse, memory and output are passed
-    // to the next depth as newly built values, not as plain references, so
-    // that a loop running the same branch again does not make cue report a
-    // structural cycle.
+    // Each depth runs twice as many steps as the one before it, so the number
+    // of steps has no bound while the depth stays around log2 of it.
     _#impl: [depth = =~"^\\d+$"]: {
         let next = "\(strconv.Atoi(depth) + 1)"
 
-        memory: [...int]
-        output: [...uint8]
-        instructionPointer: uint
-        pointer: uint
-        inputPointer: uint
+        start: {
+            ip: uint
+            pointer: uint
+            memory: [...int]
+            output: [...uint8]
+            inputPointer: uint
+        }
+        size: int
 
-        if instructionPointer == numTokens {
-            out: [{
-                "memory": [for c in memory { c + 0 }]
-                "output": [for c in output { c + 0 }]
-                "pointer": pointer
-                "inputPointer": inputPointer
-            }]
+        _s: _#evalChunk & {
+            "tokens": tokens
+            "positions": positions
+            "bracketMap": bracketMap
+            "input": input
+            "wrapAround": wrapAround
+            "size": size
+            "start": start
         }
 
-        if instructionPointer < numTokens {
-            let token = tokens[instructionPointer]
+        if _s.done {
+            out: [_s.last]
+        }
 
-            if token == _#tokens.gt {
-                out: [for out in ((_#impl & {(next): _})[next] & {
-                    if pointer + 1 == len(memory)  {
-                        "memory": list.Concat([memory, [0]])
-                    }
-
-                    if pointer + 1 < len(memory) {
-                        "memory": [for c in memory { c + 0 }]
-                    }
-
-                    "output": [for c in output { c + 0 }]
-                    "instructionPointer": instructionPointer + 1
-                    "pointer": pointer + 1
-                    "inputPointer": inputPointer + 0
-                }).out { out }]
-            }
-
-            if token == _#tokens.lt {
-                out: [for out in ((_#impl & {(next): _})[next] & {
-                    "memory": [for c in memory { c + 0 }]
-                    "output": [for c in output { c + 0 }]
-                    "instructionPointer": instructionPointer + 1
-                    "pointer": pointer - 1
-                    "inputPointer": inputPointer + 0
-                }).out { out }]
-            }
-
-            if token == _#tokens.plus {
-                out: [for out in ((_#impl & {(next): _})[next] & {
-                    "memory": [for i, cell in memory {
-                        if i == pointer {
-                            [
-                                if wrapAround && cell + 1 == 256 { 0 },
-                                cell + 1
-                            ][0]
-                        }
-
-                        if i != pointer {
-                            cell + 0
-                        }
-                    }]
-                    "output": [for c in output { c + 0 }]
-                    "instructionPointer": instructionPointer + 1
-                    "pointer": pointer + 0
-                    "inputPointer": inputPointer + 0
-                }).out { out }]
-            }
-
-            if token == _#tokens.minus {
-                out: [for out in ((_#impl & {(next): _})[next] & {
-                    "memory": [for i, cell in memory {
-                        if i == pointer {
-                            [
-                                if wrapAround && cell - 1 == -1 { 255 },
-                                cell - 1
-                            ][0]
-                        }
-                        if i != pointer {
-                            cell + 0
-                        }
-                    }]
-                    "output": [for c in output { c + 0 }]
-                    "instructionPointer": instructionPointer + 1
-                    "pointer": pointer + 0
-                    "inputPointer": inputPointer + 0
-                }).out { out }]
-            }
-
-            if token == _#tokens.period {
-                out: [for out in ((_#impl & {(next): _})[next] & {
-                    "memory": [for c in memory { c + 0 }]
-                    "output": list.Concat([output, [memory[pointer]]])
-                    "instructionPointer": instructionPointer + 1
-                    "pointer": pointer + 0
-                    "inputPointer": inputPointer + 0
-                }).out { out }]
-            }
-
-            if token == _#tokens.comma {
-                out: [for out in ((_#impl & {(next): _})[next] & {
-                    "memory": [for i, cell in memory {
-                        if i == pointer {
-                            if inputPointer < len(input) {
-                                input[inputPointer]
-                            }
-                            if inputPointer >= len(input) {
-                                0
-                            }
-                        }
-                        if i != pointer {
-                            cell + 0
-                        }
-                    }]
-                    "output": [for c in output { c + 0 }]
-                    "instructionPointer": instructionPointer + 1
-                    "pointer": pointer + 0
-                    "inputPointer": inputPointer + 1
-                }).out { out }]
-            }
-
-            if token == _#tokens.lbracket {
-                if memory[pointer] == 0 {
-                    out: [for out in ((_#impl & {(next): _})[next] & {
-                        "memory": [for c in memory { c + 0 }]
-                        "output": [for c in output { c + 0 }]
-                        "instructionPointer": bracketMap["\(instructionPointer)"] + 1
-                        "pointer": pointer + 0
-                        "inputPointer": inputPointer + 0
-                    }).out { out }]
+        if !_s.done {
+            out: [for o in ((_#impl & {(next): _})[next] & {
+                "start": {
+                    ip: _s.last.ip
+                    pointer: _s.last.pointer
+                    memory: _s.last.memory
+                    output: _s.last.output
+                    inputPointer: _s.last.inputPointer
                 }
-
-                if memory[pointer] != 0 {
-                    out: [for out in ((_#impl & {(next): _})[next] & {
-                        "memory": [for c in memory { c + 0 }]
-                        "output": [for c in output { c + 0 }]
-                        "instructionPointer": instructionPointer + 1
-                        "pointer": pointer + 0
-                        "inputPointer": inputPointer + 0
-                    }).out { out }]
-                }
-            }
-
-            if token == _#tokens.rbracket {
-                if memory[pointer] == 0 {
-                    out: [for out in ((_#impl & {(next): _})[next] & {
-                        "memory": [for c in memory { c + 0 }]
-                        "output": [for c in output { c + 0 }]
-                        "instructionPointer": instructionPointer + 1
-                        "pointer": pointer + 0
-                        "inputPointer": inputPointer + 0
-                    }).out { out }]
-                }
-
-                if memory[pointer] != 0 {
-                    out: [for out in ((_#impl & {(next): _})[next] & {
-                        "memory": [for c in memory { c + 0 }]
-                        "output": [for c in output { c + 0 }]
-                        "instructionPointer": bracketMap["\(instructionPointer)"] + 1
-                        "pointer": pointer + 0
-                        "inputPointer": inputPointer + 0
-                    }).out { out }]
-                }
-            }
+                "size": size * 2
+            }).out { o }]
         }
     }
 
     out: ((_#impl & {"0": _})["0"] & {
-        memory: [0]
-        output: []
-        instructionPointer: 0
-        pointer: 0
-        inputPointer: 0
+        start: {ip: 0, pointer: 0, memory: [0], output: [], inputPointer: 0}
+        size: firstSize
     }).out[0]
 }
 
@@ -302,24 +345,17 @@ _#eval: {
 
     out: string
 
-    _tokens: {
-        (_#scan & {
-            "sourceCode": sourceCode
-        }).out
-        ...
-    }
-
-    _parsed: {
-        (_#parse & {
-            _tokens
-        }).out
-        ...
-    }
+    _runes: strings.Runes(sourceCode)
+    _positions: [for i, r in _runes if list.Contains([_#plus, _#minus, _#gt, _#lt, _#lbracket, _#rbracket, _#period, _#comma], r) { i }]
+    _tokens: [for p in _positions { _runes[p] }]
 
     _evaluated: (_#eval & {
-        _parsed
+        tokens: _tokens
+        positions: _positions
+        bracketMap: (_#parse & {tokens: _tokens}).bracketMap
         "input": input
         "wrapAround": wrapAround
+        firstSize: 64
     }).out
 
     out: strings.Join([for c in _evaluated.output { _#uint7ToString[c] }], "")
