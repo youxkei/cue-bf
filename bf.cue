@@ -49,6 +49,11 @@ _#parse: {
 
     let numTokens = len(tokens)
 
+    // lbrackets and bracketMap are passed to the next depth as newly built
+    // values, not as plain references like `"bracketMap": bracketMap`. A plain
+    // reference shares the previous depth's vertex, and when the same branch
+    // runs again cue resolves the same reference on that vertex a second time
+    // and reports a structural cycle.
     _#impl: [depth = =~"^\\d+$"]: {
         let next = "\(strconv.Atoi(depth) + 1)"
 
@@ -66,7 +71,7 @@ _#parse: {
             if token == _#tokens.lbracket {
                 out: [for out in ((_#impl & {(next): _})[next] & {
                     "lbrackets": list.Concat([[i], lbrackets])
-                    "bracketMap": bracketMap
+                    "bracketMap": {for k, v in bracketMap { (k): v + 0 }}
                     "i": i + 1
                 }).out { out }]
             }
@@ -74,7 +79,7 @@ _#parse: {
             if token == _#tokens.rbracket {
                 out: [for out in ((_#impl & {(next): _})[next] & {
                     "lbrackets": list.Drop(lbrackets, 1)
-                    "bracketMap": bracketMap & {
+                    "bracketMap": {for k, v in bracketMap { (k): v + 0 }} & {
                         "\(lbrackets[0])": i
                         "\(i)": lbrackets[0]
                     }
@@ -84,8 +89,8 @@ _#parse: {
 
             if token != _#tokens.lbracket && token != _#tokens.rbracket {
                 out: [for out in ((_#impl & {"\(next)": _})[next] & {
-                    "lbrackets": lbrackets
-                    "bracketMap": bracketMap
+                    "lbrackets": [for l in lbrackets { l + 0 }]
+                    "bracketMap": {for k, v in bracketMap { (k): v + 0 }}
                     "i": i + 1
                 }).out { out }]
             }
@@ -110,6 +115,10 @@ _#eval: {
 
     let numTokens = len(tokens)
 
+    // As with lbrackets and bracketMap in _#parse, memory and output are passed
+    // to the next depth as newly built values, not as plain references, so
+    // that a loop running the same branch again does not make cue report a
+    // structural cycle.
     _#impl: [depth = =~"^\\d+$"]: {
         let next = "\(strconv.Atoi(depth) + 1)"
 
@@ -121,8 +130,8 @@ _#eval: {
 
         if instructionPointer == numTokens {
             out: [{
-                "memory": memory
-                "output": output
+                "memory": [for c in memory { c + 0 }]
+                "output": [for c in output { c + 0 }]
                 "pointer": pointer
                 "inputPointer": inputPointer
             }]
@@ -138,10 +147,10 @@ _#eval: {
                     }
 
                     if pointer + 1 < len(memory) {
-                        "memory": memory
+                        "memory": [for c in memory { c + 0 }]
                     }
 
-                    "output": output
+                    "output": [for c in output { c + 0 }]
                     "instructionPointer": instructionPointer + 1
                     "pointer": pointer + 1
                     "inputPointer": inputPointer + 0
@@ -150,8 +159,8 @@ _#eval: {
 
             if token == _#tokens.lt {
                 out: [for out in ((_#impl & {(next): _})[next] & {
-                    "memory": memory
-                    "output": output
+                    "memory": [for c in memory { c + 0 }]
+                    "output": [for c in output { c + 0 }]
                     "instructionPointer": instructionPointer + 1
                     "pointer": pointer - 1
                     "inputPointer": inputPointer + 0
@@ -172,7 +181,7 @@ _#eval: {
                             cell + 0
                         }
                     }]
-                    "output": output
+                    "output": [for c in output { c + 0 }]
                     "instructionPointer": instructionPointer + 1
                     "pointer": pointer + 0
                     "inputPointer": inputPointer + 0
@@ -192,7 +201,7 @@ _#eval: {
                             cell + 0
                         }
                     }]
-                    "output": output
+                    "output": [for c in output { c + 0 }]
                     "instructionPointer": instructionPointer + 1
                     "pointer": pointer + 0
                     "inputPointer": inputPointer + 0
@@ -201,7 +210,7 @@ _#eval: {
 
             if token == _#tokens.period {
                 out: [for out in ((_#impl & {(next): _})[next] & {
-                    "memory": memory
+                    "memory": [for c in memory { c + 0 }]
                     "output": list.Concat([output, [memory[pointer]]])
                     "instructionPointer": instructionPointer + 1
                     "pointer": pointer + 0
@@ -224,7 +233,7 @@ _#eval: {
                             cell + 0
                         }
                     }]
-                    "output": output
+                    "output": [for c in output { c + 0 }]
                     "instructionPointer": instructionPointer + 1
                     "pointer": pointer + 0
                     "inputPointer": inputPointer + 1
@@ -234,8 +243,8 @@ _#eval: {
             if token == _#tokens.lbracket {
                 if memory[pointer] == 0 {
                     out: [for out in ((_#impl & {(next): _})[next] & {
-                        "memory": memory
-                        "output": output
+                        "memory": [for c in memory { c + 0 }]
+                        "output": [for c in output { c + 0 }]
                         "instructionPointer": bracketMap["\(instructionPointer)"] + 1
                         "pointer": pointer + 0
                         "inputPointer": inputPointer + 0
@@ -244,8 +253,8 @@ _#eval: {
 
                 if memory[pointer] != 0 {
                     out: [for out in ((_#impl & {(next): _})[next] & {
-                        "memory": memory
-                        "output": output
+                        "memory": [for c in memory { c + 0 }]
+                        "output": [for c in output { c + 0 }]
                         "instructionPointer": instructionPointer + 1
                         "pointer": pointer + 0
                         "inputPointer": inputPointer + 0
@@ -256,8 +265,8 @@ _#eval: {
             if token == _#tokens.rbracket {
                 if memory[pointer] == 0 {
                     out: [for out in ((_#impl & {(next): _})[next] & {
-                        "memory": memory
-                        "output": output
+                        "memory": [for c in memory { c + 0 }]
+                        "output": [for c in output { c + 0 }]
                         "instructionPointer": instructionPointer + 1
                         "pointer": pointer + 0
                         "inputPointer": inputPointer + 0
@@ -266,8 +275,8 @@ _#eval: {
 
                 if memory[pointer] != 0 {
                     out: [for out in ((_#impl & {(next): _})[next] & {
-                        "memory": memory
-                        "output": output
+                        "memory": [for c in memory { c + 0 }]
+                        "output": [for c in output { c + 0 }]
                         "instructionPointer": bracketMap["\(instructionPointer)"] + 1
                         "pointer": pointer + 0
                         "inputPointer": inputPointer + 0
